@@ -14,47 +14,51 @@ export interface AiCompletionResult {
   }>;
 }
 
-function messagesToContents(messages: StoredMessage[]): Content[] {
-  return messages.map((msg): Content => {
-    if (msg.role === "user") {
-      return {
-        role: "user",
-        parts: [{ text: msg.content || "" }],
-      };
+/** Retry with exponential backoff on transient Gemini errors. */
+async function withRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 4): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      const msg = error instanceof Error ? error.message : String(error);
+      const isTransient =
+        msg.includes("503") ||
+        msg.includes("UNAVAILABLE") ||
+        msg.includes("429") ||
+        msg.includes("resource_exhausted") ||
+        msg.includes("RESOURCE_EXHAUSTED") ||
+        msg.includes("model output must contain") ||
+        msg.includes("cannot both be empty");
+
+      if (!isTransient || attempt === maxAttempts) break;
+      const delayMs = Math.min(1000 * 2 ** (attempt - 1), 8000);
+      console.warn(`[${label}] Transient error on attempt ${attempt}/${maxAttempts}, retrying in ${delayMs}ms…`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
-    if (msg.role === "model") {
-      const parts: Part[] = [];
-      if (msg.functionCalls?.length) {
-        for (const call of msg.functionCalls) {
-          parts.push({ functionCall: { name: call.name, args: call.args } });
-        }
-      }
-      if (msg.content) {
-        parts.push({ text: msg.content });
-      }
-      return {
-        role: "model",
-        parts: parts.length > 0 ? parts : [{ text: "" }],
-      };
+  }
+  throw lastError;
+}
+
+/**
+ * Convert only user-text and model-text stored messages to Gemini Content[].
+ * Tool turns are intentionally excluded — the chat sessions API handles them
+ * in-session via sendMessage, so we never need to reconstruct them.
+ */
+function historyToContents(messages: StoredMessage[]): Content[] {
+  const result: Content[] = [];
+  for (const msg of messages) {
+    if (msg.role === "user" && msg.content) {
+      result.push({ role: "user", parts: [{ text: msg.content }] });
+    } else if (msg.role === "model" && msg.content && !msg.functionCalls?.length) {
+      // Only include plain model-text turns; skip model turns that are
+      // purely function-call turns (they have no text and would require
+      // thoughtSignature to reconstruct correctly).
+      result.push({ role: "model", parts: [{ text: msg.content }] });
     }
-    if (msg.role === "tool" && msg.functionResponse) {
-      return {
-        role: "tool",
-        parts: [
-          {
-            functionResponse: {
-              name: msg.functionResponse.name,
-              response: msg.functionResponse.response,
-            },
-          },
-        ],
-      };
-    }
-    return {
-      role: "user",
-      parts: [{ text: msg.content || "" }],
-    };
-  });
+  }
+  return result;
 }
 
 export class AiService {
@@ -64,19 +68,34 @@ export class AiService {
     this.client = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
   }
 
-  async complete(messages: StoredMessage[]): Promise<AiCompletionResult> {
-    try {
-      const contents = messagesToContents(messages);
-      const response = await this.client.models.generateContent({
-        model: this.env.GEMINI_MODEL,
-        contents,
-        config: {
-          systemInstruction: `${systemPrompt} Current timestamp: ${new Date().toISOString()}. Current timezone: ${this.env.APP_TIMEZONE}.`,
-          temperature: 0.2,
-          tools: [{ functionDeclarations: [createReminderDeclaration] }],
-        },
-      });
+  private get chatConfig() {
+    return {
+      systemInstruction: `${systemPrompt} Current timestamp: ${new Date().toISOString()}. Current timezone: ${this.env.APP_TIMEZONE}.`,
+      temperature: 0.2,
+      tools: [{ functionDeclarations: [createReminderDeclaration] }],
+    };
+  }
 
+  /**
+   * Create a Gemini Chat Session seeded with conversation history.
+   * Returns a thin wrapper that sends one message and returns the parsed result.
+   */
+  createSession(previousMessages: StoredMessage[]) {
+    const history = historyToContents(previousMessages);
+    const chat = this.client.chats.create({
+      model: this.env.GEMINI_MODEL,
+      history,
+      config: this.chatConfig,
+    });
+
+    const send = async (content: string | Part[]): Promise<AiCompletionResult> => {
+      const response = await withRetry(
+        () =>
+          typeof content === "string"
+            ? chat.sendMessage({ message: content })
+            : chat.sendMessage({ message: content }),
+        "Gemini chat",
+      );
       const functionCalls =
         response.functionCalls && response.functionCalls.length > 0
           ? response.functionCalls.map((call) => ({
@@ -84,52 +103,40 @@ export class AiService {
               args: (call.args || {}) as Record<string, unknown>,
             }))
           : undefined;
+      return { text: response.text || undefined, functionCalls };
+    };
 
-      return {
-        text: response.text || undefined,
-        functionCalls,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error("Gemini chat request failed", { message });
-      const lower = message.toLowerCase();
-      if (lower.includes("429") || lower.includes("quota") || lower.includes("resource_exhausted")) {
-        throw new AppError("AI_QUOTA_EXCEEDED", "Gemini quota or rate limit exceeded. Please check your Gemini API plan.", 502);
-      }
-      if (lower.includes("401") || lower.includes("403") || lower.includes("api_key_invalid") || lower.includes("api key not valid")) {
-        throw new AppError("AI_AUTH_FAILED", "Invalid Gemini API key. Please check your GEMINI_API_KEY configuration.", 502);
-      }
-      throw new AppError("AI_REQUEST_FAILED", "Unable to process your request right now.", 502);
-    }
+    return { send };
   }
 
   async transcribe(file: Pick<Express.Multer.File, "buffer" | "originalname" | "mimetype">): Promise<{ text: string }> {
     try {
-      const response = await this.client.models.generateContent({
-        model: this.env.GEMINI_MODEL,
-        contents: [
-          {
-            role: "user",
-            parts: [
+      const response = await withRetry(
+        () =>
+          this.client.models.generateContent({
+            model: this.env.GEMINI_MODEL,
+            contents: [
               {
-                inlineData: {
-                  mimeType: file.mimetype,
-                  data: file.buffer.toString("base64"),
-                },
-              },
-              {
-                text: "Generate an accurate transcript of the speech in this audio recording. Return only the transcription text with no additional commentary, preamble, or formatting.",
+                role: "user",
+                parts: [
+                  { inlineData: { mimeType: file.mimetype, data: file.buffer.toString("base64") } },
+                  { text: "Generate an accurate transcript of the speech in this audio recording. Return only the transcription text with no additional commentary, preamble, or formatting." },
+                ],
               },
             ],
-          },
-        ],
-      });
+          }),
+        "Gemini transcription",
+      );
       const text = response.text?.trim();
       if (!text) throw new Error("No transcription returned");
       return { text };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error("Gemini transcription failed", { message });
+      const lower = message.toLowerCase();
+      if (lower.includes("503") || lower.includes("unavailable")) {
+        throw new AppError("TRANSCRIPTION_UNAVAILABLE", "Gemini is temporarily busy. Please try again in a moment.", 503);
+      }
       throw new AppError("TRANSCRIPTION_FAILED", "Unable to transcribe that recording.", 502);
     }
   }

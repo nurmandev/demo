@@ -18,7 +18,7 @@ export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void
     <header className="relative z-10 flex h-16 w-full overflow-hidden bg-transparent" aria-label="Miracle Edem navigation">
       <div className="relative flex h-10 min-w-0 flex-1 items-center px-3 sm:px-6 bg-slate-50 dark:bg-slate-950">
         <RailLines />
-        <span className="relative z-10 text-xs font-semibold tracking-wide text-slate-800 dark:text-slate-200">Miracle Edem</span>
+        <span className="relative z-10 hidden sm:block text-xs font-semibold tracking-wide text-slate-800 dark:text-slate-200">Miracle Edem</span>
       </div>
       <div className="relative z-10 flex h-16 shrink-0 -ml-px">
         <div className="relative h-full w-[50px] shrink-0">
@@ -41,7 +41,7 @@ export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void
       </div>
       <div className="relative -ml-px flex h-10 min-w-0 flex-1 items-center justify-end gap-2 bg-slate-50 px-2 dark:bg-slate-950 sm:px-6">
         <RailLines />
-        {hasMessages && onNewChat && (
+        {hasMessages && onNewChat ? (
           <button
             type="button"
             onClick={onNewChat}
@@ -49,8 +49,9 @@ export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void
           >
             New chat
           </button>
+        ) : (
+          <GenerateButton label="Login" activeLabel="Login" onClick={() => navigate("/login")} className="relative z-10 h-8 w-[88px] border border-slate-400/60 text-xs shadow-none sm:h-9 sm:w-[94px] sm:text-sm" aria-label="Open login page" />
         )}
-        <GenerateButton label="Login" activeLabel="Login" onClick={() => navigate("/login")} className="relative z-10 h-8 w-[88px] border border-slate-400/60 text-xs shadow-none sm:h-9 sm:w-[94px] sm:text-sm" aria-label="Open login page" />
       </div>
     </header>
   );
