@@ -171,14 +171,16 @@ export function LoginModal({
         </div>
 
         <div className="px-5 py-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">
-            {mode === "login" ? "Authentication required" : "Get started"}
-          </p>
-          <p className="mt-1 text-sm text-slate-500">
-            {mode === "login"
-              ? "Sign in to chat with the assistant and create reminders."
-              : "Register to unlock your assistant workspace."}
-          </p>
+          {mode === "register" && (
+            <>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">
+                Get started
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                Register to unlock your assistant workspace.
+              </p>
+            </>
+          )}
 
           <form className="mt-5 space-y-3.5" onSubmit={handleSubmit} noValidate>
             {mode === "register" && (
