@@ -15,9 +15,10 @@ export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void
   const navigate = useNavigate();
 
   return (
-    <header className="relative z-10 flex h-16 w-full overflow-hidden bg-transparent" aria-label="AI Assistant navigation">
-      <div className="relative h-10 min-w-0 flex-1 bg-slate-50 dark:bg-slate-950">
+    <header className="relative z-10 flex h-16 w-full overflow-hidden bg-transparent" aria-label="Miracle Edem navigation">
+      <div className="relative flex h-10 min-w-0 flex-1 items-center px-3 sm:px-6 bg-slate-50 dark:bg-slate-950">
         <RailLines />
+        <span className="relative z-10 text-xs font-semibold tracking-wide text-slate-800 dark:text-slate-200">Miracle Edem</span>
       </div>
       <div className="relative z-10 flex h-16 shrink-0 -ml-px">
         <div className="relative h-full w-[50px] shrink-0">
@@ -29,8 +30,8 @@ export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void
             <line x1="0" y1="60.5" x2="100%" y2="60.5" stroke="currentColor" strokeOpacity="0.04" strokeWidth="0.5" />
           </svg>
           <div className="relative flex h-full min-w-[150px] items-end justify-between gap-2 px-2 pb-2 sm:min-w-[420px] sm:gap-6 sm:px-8">
-            <div className="absolute bottom-1 left-1/2 flex size-9 -translate-x-1/2 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-lg shadow-slate-950/15 transition-transform hover:scale-105 sm:size-10 dark:bg-white dark:text-slate-950">
-              <BrainCircuit className="size-4 sm:size-5" />
+            <div className="absolute bottom-1 left-1/2 flex size-9 -translate-x-1/2 items-center justify-center rounded-2xl bg-slate-950 p-2 text-white shadow-lg shadow-slate-950/15 transition-transform hover:scale-105 sm:size-10 dark:bg-white dark:text-slate-950">
+              <img src="/favicon.svg" alt="Miracle Edem" className="size-5 sm:size-6" />
             </div>
           </div>
         </div>

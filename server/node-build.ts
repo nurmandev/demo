@@ -23,7 +23,7 @@ async function bootstrap() {
   });
 
   const server = app.listen(env.PORT, "0.0.0.0", () => {
-    console.log(`Fusion Assistant server listening on port ${env.PORT}`);
+    console.log(`Miracle Edem server listening on port ${env.PORT}`);
   });
 
   const shutdown = async (signal: string) => {

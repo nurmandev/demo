@@ -1,4 +1,4 @@
-# AI Voice/Text Assistant
+# Miracle Edem
 
 A focused React and TypeScript technical-evaluation prototype for the flow:
 
