@@ -1,13 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, ArrowRight, BrainCircuit, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { signUp } from "@/lib/auth-client";
+import { signUp, useSession } from "@/lib/auth-client";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { data: session, isPending } = useSession();
   const [name, setName] = useState("");
+
+  useEffect(() => {
+    if (!isPending && session) {
+      navigate("/");
+    }
+  }, [session, isPending, navigate]);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

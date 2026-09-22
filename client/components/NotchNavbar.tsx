@@ -1,7 +1,16 @@
 import { useNavigate } from "react-router-dom";
-import { LogOut, User } from "lucide-react";
+import { LogOut, User, Settings, UserCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useSession, signOut } from "@/lib/auth-client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 function RailLines() {
   return (
@@ -12,7 +21,15 @@ function RailLines() {
   );
 }
 
-export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void; hasMessages?: boolean } = {}) {
+export function NotchNavbar({
+  onNewChat,
+  hasMessages,
+  onOpenLogin,
+}: {
+  onNewChat?: () => void;
+  hasMessages?: boolean;
+  onOpenLogin?: () => void;
+} = {}) {
   const navigate = useNavigate();
   const { data: session } = useSession();
 
@@ -20,7 +37,6 @@ export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void
     try {
       await signOut();
       toast.success("Signed out successfully.");
-      navigate("/login");
     } catch {
       toast.error("Failed to sign out.");
     }
@@ -63,26 +79,53 @@ export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void
           </button>
         )}
         {session?.user ? (
-          <div className="relative z-20 flex items-center gap-1.5 sm:gap-2">
-            <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-              <User className="size-3.5" />
-              {session.user.name || session.user.email}
-            </span>
-            <button
-              type="button"
-              onClick={handleSignOut}
-              aria-label="Sign out"
-              className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-400 hover:bg-slate-50 active:scale-95 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-700 cursor-pointer shrink-0"
-            >
-              <LogOut className="size-3.5" />
-              <span>Logout</span>
-            </button>
+          <div className="relative z-20 flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 rounded-full border border-slate-300 bg-white p-1 pr-3 text-sm font-medium shadow-sm transition-all hover:border-slate-400 hover:bg-slate-50 active:scale-95 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-700 cursor-pointer">
+                  <Avatar className="size-7 sm:size-8">
+                    <AvatarImage src={session.user.image || undefined} alt={session.user.name} />
+                    <AvatarFallback className="bg-slate-100 text-[10px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                      {session.user.name?.split(" ").map(n => n[0]).join("").toUpperCase() || session.user.email[0].toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="hidden max-w-[100px] truncate sm:inline-block">
+                    {session.user.name || session.user.email}
+                  </span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 rounded-xl p-2 shadow-xl">
+                <DropdownMenuLabel className="px-2 py-1.5 text-xs font-normal text-slate-500 dark:text-slate-400">
+                  Logged in as
+                  <div className="mt-0.5 truncate font-medium text-slate-900 dark:text-slate-100">
+                    {session.user.email}
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="my-1" />
+                <DropdownMenuItem className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
+                  <UserCircle className="size-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-800">
+                  <Settings className="size-4" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="my-1" />
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                >
+                  <LogOut className="size-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         ) : (
           <button
             type="button"
-            onClick={() => navigate("/login")}
-            aria-label="Open login page"
+            onClick={onOpenLogin ? onOpenLogin : () => navigate("/login")}
+            aria-label="Open login popup"
             className="relative z-20 inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-xs sm:text-sm font-semibold text-slate-800 shadow-sm transition-all hover:border-slate-400 hover:bg-slate-50 hover:shadow active:scale-95 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-700 cursor-pointer shrink-0"
           >
             Login

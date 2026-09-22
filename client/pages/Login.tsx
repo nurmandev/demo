@@ -1,13 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, ArrowRight, BrainCircuit, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { signIn } from "@/lib/auth-client";
+import { signIn, useSession } from "@/lib/auth-client";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { data: session, isPending } = useSession();
   const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    if (!isPending && session) {
+      navigate("/");
+    }
+  }, [session, isPending, navigate]);
+
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, ArrowUp, Bot, BrainCircuit, Check, Clock3, Loader2, Mic, UserRound, WandSparkles } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { AlertCircle, ArrowUp, Bot, BrainCircuit, Check, Clock3, Mic, UserRound, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { sendMessage } from "@/services/api";
 import { NotchNavbar } from "@/components/NotchNavbar";
 import { VoiceConversationModal } from "@/components/VoiceConversationModal";
+import { LoginModal } from "@/components/LoginModal";
 import { useSession } from "@/lib/auth-client";
 import type { ChatMessage, ReminderAction } from "@/types/chat";
 
@@ -81,8 +81,7 @@ function MessageItem({ message }: { message: ChatMessage }) {
 }
 
 export default function Index() {
-  const navigate = useNavigate();
-  const { data: session, isPending: sessionLoading } = useSession();
+  const { data: session } = useSession();
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
@@ -95,6 +94,7 @@ export default function Index() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [error, setError] = useState("");
   const [conversationId, setConversationId] = useState<string | undefined>(() => {
     try {
@@ -104,13 +104,6 @@ export default function Index() {
     }
   });
   const conversationRef = useRef<HTMLDivElement>(null);
-
-  // Protected route enforcement
-  useEffect(() => {
-    if (!sessionLoading && !session?.user) {
-      navigate("/login");
-    }
-  }, [session, sessionLoading, navigate]);
 
   useEffect(() => {
     try {
@@ -162,6 +155,26 @@ export default function Index() {
   const submit = async (value = input) => {
     const message = value.trim();
     if (!message || loading) return;
+
+    // If user is not authenticated, show AI prompt telling user to log in and pop up the login modal
+    if (!session?.user) {
+      setError("");
+      setInput("");
+      setMessages((current) => [
+        ...current,
+        { id: crypto.randomUUID(), role: "user", content: message, status: "success" },
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "You must be logged in to use the AI assistant and create reminders. Please sign in or create an account to continue.",
+          status: "success",
+        },
+      ]);
+      setLoginModalOpen(true);
+      toast.info("Please log in to continue.");
+      return;
+    }
+
     setError("");
     setInput("");
     setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: message, status: "success" }]);
@@ -176,8 +189,17 @@ export default function Index() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unable to reach the assistant.";
       if (errorMessage.toLowerCase().includes("unauthorized") || errorMessage.toLowerCase().includes("authentication")) {
+        setMessages((current) => [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: "You must be logged in to use the AI assistant. Please sign in to continue.",
+            status: "success",
+          },
+        ]);
+        setLoginModalOpen(true);
         toast.error("Your session has expired. Please log in again.");
-        navigate("/login");
         return;
       }
       setError(errorMessage);
@@ -187,25 +209,14 @@ export default function Index() {
     }
   };
 
-  if (sessionLoading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f4f7fb] dark:bg-[#0d1117]">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="size-8 animate-spin text-blue-600" />
-          <p className="text-xs font-medium text-slate-500">Checking authentication...</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!session?.user) {
-    return null;
-  }
-
   return (
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 text-slate-950 dark:bg-[#0d1117] dark:text-white sm:px-6 sm:py-6">
       <section className="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-5xl flex-col overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_24px_80px_-32px_rgba(15,23,42,0.28)] dark:border-slate-800 dark:bg-slate-950 sm:min-h-[calc(100vh-3rem)]">
-        <NotchNavbar onNewChat={handleNewChat} hasMessages={messages.length > 0} />
+        <NotchNavbar
+          onNewChat={handleNewChat}
+          hasMessages={messages.length > 0}
+          onOpenLogin={() => setLoginModalOpen(true)}
+        />
 
         <div ref={conversationRef} role="log" aria-live="polite" tabIndex={0} className="min-h-0 flex-1 overflow-y-auto bg-[linear-gradient(to_bottom,rgba(248,250,252,0.6),rgba(255,255,255,0))] dark:bg-[linear-gradient(to_bottom,rgba(15,23,42,0.35),rgba(2,6,23,0))]">
           {messages.length === 0 ? (
@@ -215,7 +226,7 @@ export default function Index() {
                   <img src="/favicon.svg" alt="Miracle Edem" className="size-8" />
                 </div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
-                  Welcome, {session.user.name || session.user.email}
+                  {session?.user ? `Welcome, ${session.user.name || session.user.email}` : "Miracle Edem"}
                 </p>
                 <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">How can I help?</h2>
                 <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
@@ -230,7 +241,7 @@ export default function Index() {
                         setInput(example);
                         void submit(example);
                       }}
-                      className="group rounded-2xl border border-slate-200 bg-white p-4 text-left text-sm leading-5 text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                      className="group rounded-2xl border border-slate-200 bg-white p-4 text-left text-sm leading-5 text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 cursor-pointer"
                     >
                       <span className="mb-3 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 group-hover:text-blue-600">
                         Try an example
@@ -324,6 +335,13 @@ export default function Index() {
         open={voiceOpen}
         onClose={() => setVoiceOpen(false)}
         onTranscript={handleVoiceTranscript}
+      />
+
+      {/* Login / Register Popup Modal */}
+      <LoginModal
+        open={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+        onSuccess={() => setLoginModalOpen(false)}
       />
     </main>
   );
