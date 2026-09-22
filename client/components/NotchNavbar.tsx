@@ -1,6 +1,4 @@
-import { BrainCircuit } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { GenerateButton } from "@/components/GenerateButton";
 
 function RailLines() {
   return (
@@ -15,13 +13,13 @@ export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void
   const navigate = useNavigate();
 
   return (
-    <header className="relative z-10 flex h-16 w-full overflow-hidden bg-transparent" aria-label="Miracle Edem navigation">
-      <div className="relative flex h-10 min-w-0 flex-1 items-center px-3 sm:px-6 bg-slate-50 dark:bg-slate-950">
+    <header className="relative z-10 flex h-16 w-full bg-transparent" aria-label="Miracle Edem navigation">
+      <div className="relative flex h-10 min-w-0 flex-1 items-center px-2 sm:px-6 bg-slate-50 dark:bg-slate-950">
         <RailLines />
         <span className="relative z-10 hidden sm:block text-xs font-semibold tracking-wide text-slate-800 dark:text-slate-200">Miracle Edem</span>
       </div>
       <div className="relative z-10 flex h-16 shrink-0 -ml-px">
-        <div className="relative h-full w-[50px] shrink-0">
+        <div className="relative h-full w-[24px] sm:w-[50px] shrink-0">
           <div className="absolute inset-0 bg-slate-50 dark:bg-slate-950" style={{ clipPath: 'path("M 0 0 H 50 V 64 C 25 64 25 40 0 40 Z")' }} />
         </div>
         <div className="relative h-full min-w-0 flex-1 -ml-px bg-slate-50 dark:bg-slate-950">
@@ -29,30 +27,38 @@ export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void
             <line x1="0" y1="63.5" x2="100%" y2="63.5" stroke="currentColor" strokeOpacity="0.06" strokeWidth="0.5" />
             <line x1="0" y1="60.5" x2="100%" y2="60.5" stroke="currentColor" strokeOpacity="0.04" strokeWidth="0.5" />
           </svg>
-          <div className="relative flex h-full min-w-[150px] items-end justify-between gap-2 px-2 pb-2 sm:min-w-[420px] sm:gap-6 sm:px-8">
-            <div className="absolute bottom-1 left-1/2 flex size-9 -translate-x-1/2 items-center justify-center rounded-2xl bg-slate-950 p-2 text-white shadow-lg shadow-slate-950/15 transition-transform hover:scale-105 sm:size-10 dark:bg-white dark:text-slate-950">
+          <div className="relative flex h-full min-w-[60px] items-end justify-between gap-2 px-2 pb-2 sm:min-w-[420px] sm:gap-6 sm:px-8">
+            <div className="absolute bottom-1 left-1/2 flex size-8 -translate-x-1/2 items-center justify-center rounded-2xl bg-slate-950 p-1.5 text-white shadow-lg shadow-slate-950/15 transition-transform hover:scale-105 sm:size-10 sm:p-2 dark:bg-white dark:text-slate-950">
               <img src="/favicon.svg" alt="Miracle Edem" className="size-5 sm:size-6" />
             </div>
           </div>
         </div>
-        <div className="relative -ml-px h-full w-[50px] shrink-0">
+        <div className="relative -ml-px h-full w-[24px] sm:w-[50px] shrink-0">
           <div className="absolute inset-0 bg-slate-50 dark:bg-slate-950" style={{ clipPath: 'path("M 0 0 H 50 V 40 C 25 40 25 64 0 64 Z")' }} />
         </div>
       </div>
-      <div className="relative -ml-px flex h-10 min-w-0 flex-1 items-center justify-end gap-2 bg-slate-50 px-2 dark:bg-slate-950 sm:px-6">
+      <div className="relative -ml-px flex h-10 min-w-0 flex-1 items-center justify-end gap-2 bg-slate-50 px-3 sm:px-6 dark:bg-slate-950">
         <RailLines />
         {hasMessages && onNewChat ? (
           <button
             type="button"
             onClick={onNewChat}
-            className="relative z-10 rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+            className="relative z-20 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-200/60 hover:text-slate-900 active:scale-95 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white cursor-pointer"
           >
             New chat
           </button>
         ) : (
-          <GenerateButton label="Login" activeLabel="Login" onClick={() => navigate("/login")} className="relative z-10 h-8 w-[88px] border border-slate-400/60 text-xs shadow-none sm:h-9 sm:w-[94px] sm:text-sm" aria-label="Open login page" />
+          <button
+            type="button"
+            onClick={() => navigate("/login")}
+            aria-label="Open login page"
+            className="relative z-20 inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm transition-all hover:border-slate-400 hover:bg-slate-50 active:scale-95 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-700 sm:px-4 sm:py-2 sm:text-sm cursor-pointer shrink-0"
+          >
+            Login
+          </button>
         )}
       </div>
     </header>
   );
 }
+
