@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, BrainCircuit, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, BrainCircuit, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -18,19 +19,26 @@ export default function Login() {
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setError("Email is required.");
+      const msg = "Email is required.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setError("Please enter a valid email address.");
+      const msg = "Please enter a valid email address.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     if (!password) {
-      setError("Password is required.");
+      const msg = "Password is required.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
     setLoading(true);
+    const toastId = toast.loading("Signing in...");
     try {
       const response = await signIn.email({
         email: trimmedEmail,
@@ -40,15 +48,15 @@ export default function Login() {
       if (response.error) {
         const errorMsg = response.error.message || "Invalid email or password.";
         setError(errorMsg);
-        toast.error(errorMsg);
+        toast.error(errorMsg, { id: toastId });
       } else {
-        toast.success("Welcome back!");
+        toast.success("Welcome back!", { id: toastId });
         navigate("/");
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to sign in. Please try again.";
+      const errorMsg = err instanceof Error ? err.message : "Unable to sign in right now. Please try again.";
       setError(errorMsg);
-      toast.error(errorMsg);
+      toast.error(errorMsg, { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -110,19 +118,30 @@ export default function Login() {
                 >
                   Password
                 </label>
-                <input
-                  id="login-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (error) setError("");
-                  }}
-                  disabled={loading}
-                  placeholder="Enter your password"
-                  autoComplete="current-password"
-                  className="mt-2 flex h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900"
-                />
+                <div className="relative mt-2">
+                  <input
+                    id="login-password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (error) setError("");
+                    }}
+                    disabled={loading}
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    className="flex h-11 w-full rounded-xl border border-slate-200 bg-white pl-3 pr-10 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </div>
 
               {error && (

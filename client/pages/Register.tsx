@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, BrainCircuit, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, BrainCircuit, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -20,35 +22,48 @@ export default function Register() {
 
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setError("Name is required.");
+      const msg = "Name is required.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setError("Email is required.");
+      const msg = "Email is required.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      setError("Please enter a valid email address.");
+      const msg = "Please enter a valid email address.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
     if (!password) {
-      setError("Password is required.");
+      const msg = "Password is required.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
     if (password.length < 8) {
-      setError("Password must be at least 8 characters long.");
+      const msg = "Password must be at least 8 characters long.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      const msg = "Passwords do not match.";
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
     setLoading(true);
+    const toastId = toast.loading("Creating account...");
     try {
       const response = await signUp.email({
         name: trimmedName,
@@ -59,15 +74,15 @@ export default function Register() {
       if (response.error) {
         const errorMsg = response.error.message || "Failed to create account.";
         setError(errorMsg);
-        toast.error(errorMsg);
+        toast.error(errorMsg, { id: toastId });
       } else {
-        toast.success("Account created successfully!");
+        toast.success("Account created successfully!", { id: toastId });
         navigate("/");
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to register. Please try again.";
       setError(errorMsg);
-      toast.error(errorMsg);
+      toast.error(errorMsg, { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -148,19 +163,30 @@ export default function Register() {
                 >
                   Password
                 </label>
-                <input
-                  id="register-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (error) setError("");
-                  }}
-                  disabled={loading}
-                  placeholder="At least 8 characters"
-                  autoComplete="new-password"
-                  className="mt-2 flex h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900"
-                />
+                <div className="relative mt-2">
+                  <input
+                    id="register-password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (error) setError("");
+                    }}
+                    disabled={loading}
+                    placeholder="At least 8 characters"
+                    autoComplete="new-password"
+                    className="flex h-11 w-full rounded-xl border border-slate-200 bg-white pl-3 pr-10 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -170,19 +196,30 @@ export default function Register() {
                 >
                   Confirm Password
                 </label>
-                <input
-                  id="register-confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    if (error) setError("");
-                  }}
-                  disabled={loading}
-                  placeholder="Repeat your password"
-                  autoComplete="new-password"
-                  className="mt-2 flex h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900"
-                />
+                <div className="relative mt-2">
+                  <input
+                    id="register-confirm-password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (error) setError("");
+                    }}
+                    disabled={loading}
+                    placeholder="Repeat your password"
+                    autoComplete="new-password"
+                    className="flex h-11 w-full rounded-xl border border-slate-200 bg-white pl-3 pr-10 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    tabIndex={-1}
+                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
               </div>
 
               {error && (
