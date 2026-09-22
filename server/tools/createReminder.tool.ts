@@ -21,7 +21,7 @@ export const createReminderDeclaration: FunctionDeclaration = {
       },
       scheduledAt: {
         type: Type.STRING,
-        description: "The scheduled date and time as an ISO-8601 datetime with timezone offset.",
+        description: "The scheduled date and time as a complete ISO-8601 datetime with explicit timezone offset (e.g. 2026-09-23T10:00:00Z or 2026-09-23T10:00:00.000Z).",
       },
     },
     required: ["title", "scheduledAt"],
