@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, ArrowUp, Bot, BrainCircuit, Check, Clock3, Mic, Square, UserRound, WandSparkles } from "lucide-react";
+import { AlertCircle, ArrowUp, Bot, BrainCircuit, Check, Clock3, Mic, UserRound, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { sendMessage, transcribeAudio } from "@/services/api";
+import { sendMessage } from "@/services/api";
 import { NotchNavbar } from "@/components/NotchNavbar";
+import { VoiceConversationModal } from "@/components/VoiceConversationModal";
 import type { ChatMessage, ReminderAction } from "@/types/chat";
-
-type VoiceState = "idle" | "recording" | "processing" | "success" | "error";
 
 const examples = [
   "Remind me tomorrow at 10 AM to call John.",
@@ -90,7 +89,7 @@ export default function Index() {
   });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [error, setError] = useState("");
   const [conversationId, setConversationId] = useState<string | undefined>(() => {
     try {
@@ -99,9 +98,6 @@ export default function Index() {
       return undefined;
     }
   });
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   const conversationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -146,51 +142,11 @@ export default function Index() {
     if (conversation) conversation.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
-  useEffect(() => () => {
-    recorderRef.current?.stop();
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-  }, []);
-
-  const toggleRecording = async () => {
-    if (voiceState === "recording") {
-      setVoiceState("processing");
-      recorderRef.current?.stop();
-      return;
-    }
-    if (loading || voiceState === "processing") return;
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setVoiceState("error");
-      toast.error("Voice recording is not supported in this browser.");
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm";
-      const recorder = new MediaRecorder(stream, { mimeType });
-      audioChunksRef.current = [];
-      streamRef.current = stream;
-      recorderRef.current = recorder;
-      recorder.ondataavailable = (event) => { if (event.data.size) audioChunksRef.current.push(event.data); };
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-        try {
-          const transcript = await transcribeAudio(new Blob(audioChunksRef.current, { type: mimeType }));
-          setInput(transcript);
-          setVoiceState("success");
-          toast.success("Voice request added to your message.");
-        } catch (transcriptionError) {
-          setVoiceState("error");
-          toast.error(transcriptionError instanceof Error ? transcriptionError.message : "Unable to transcribe recording.");
-        }
-      };
-      setError("");
-      setVoiceState("recording");
-      recorder.start();
-    } catch {
-      setVoiceState("error");
-      toast.error("Microphone access is required for voice input.");
-    }
+  // Called when voice modal confirms transcript — put it in input and auto-submit
+  const handleVoiceTranscript = (text: string) => {
+    setInput(text);
+    // Submit after React flushes the state update
+    setTimeout(() => void submit(text), 0);
   };
 
   const submit = async (value = input) => {
@@ -222,11 +178,63 @@ export default function Index() {
         <NotchNavbar onNewChat={handleNewChat} hasMessages={messages.length > 0} />
 
         <div ref={conversationRef} role="log" aria-live="polite" tabIndex={0} className="min-h-0 flex-1 overflow-y-auto bg-[linear-gradient(to_bottom,rgba(248,250,252,0.6),rgba(255,255,255,0))] dark:bg-[linear-gradient(to_bottom,rgba(15,23,42,0.35),rgba(2,6,23,0))]">
-          {messages.length === 0 ? <div className="flex min-h-full items-center justify-center px-5 py-12 sm:px-8"><div className="w-full max-w-xl text-center"><div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-blue-50 p-2.5 dark:bg-blue-950/50"><img src="/favicon.svg" alt="Miracle Edem" className="size-8" /></div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Miracle Edem</p><h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">How can I help?</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">Type or speak a request to get started. I’ll turn it into a useful action.</p><div className="mt-8 grid gap-3 text-left sm:grid-cols-2">{examples.map((example) => <button key={example} type="button" onClick={() => { setInput(example); void submit(example); }} className="group rounded-2xl border border-slate-200 bg-white p-4 text-left text-sm leading-5 text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"><span className="mb-3 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 group-hover:text-blue-600">Try an example</span>{example}</button>)}</div></div></div> : <div className="py-6">{messages.map((message) => <MessageItem key={message.id} message={message} />)}{loading && <div className="mx-auto flex w-full max-w-2xl gap-3 px-4 py-3 sm:px-8"><div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300"><BrainCircuit className="size-4" /></div><div className="rounded-2xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900"><span className="inline-flex items-center gap-2"><span className="flex gap-1"><i className="size-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.2s]" /><i className="size-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.1s]" /><i className="size-1.5 animate-bounce rounded-full bg-blue-500" /></span>AI is thinking</span></div></div>}</div>}
+          {messages.length === 0 ? <div className="flex min-h-full items-center justify-center px-5 py-12 sm:px-8"><div className="w-full max-w-xl text-center"><div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-blue-50 p-2.5 dark:bg-blue-950/50"><img src="/favicon.svg" alt="Miracle Edem" className="size-8" /></div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Miracle Edem</p><h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">How can I help?</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">Type or speak a request to get started. I'll turn it into a useful action.</p><div className="mt-8 grid gap-3 text-left sm:grid-cols-2">{examples.map((example) => <button key={example} type="button" onClick={() => { setInput(example); void submit(example); }} className="group rounded-2xl border border-slate-200 bg-white p-4 text-left text-sm leading-5 text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"><span className="mb-3 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 group-hover:text-blue-600">Try an example</span>{example}</button>)}</div></div></div> : <div className="py-6">{messages.map((message) => <MessageItem key={message.id} message={message} />)}{loading && <div className="mx-auto flex w-full max-w-2xl gap-3 px-4 py-3 sm:px-8"><div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300"><BrainCircuit className="size-4" /></div><div className="rounded-2xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900"><span className="inline-flex items-center gap-2"><span className="flex gap-1"><i className="size-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.2s]" /><i className="size-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.1s]" /><i className="size-1.5 animate-bounce rounded-full bg-blue-500" /></span>AI is thinking</span></div></div>}</div>}
         </div>
 
-        <footer className="border-t border-slate-100 bg-white p-4 sm:p-6 dark:border-slate-800 dark:bg-slate-950"><div className={`mx-auto max-w-2xl rounded-2xl border bg-slate-50 p-2 transition-colors dark:bg-slate-900/80 ${error ? "border-rose-300 dark:border-rose-800" : "border-slate-200 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 dark:border-slate-700"}`}><label htmlFor="assistant-input" className="sr-only">Message the AI assistant</label><Textarea id="assistant-input" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} placeholder="Type a request..." disabled={loading || voiceState === "processing"} rows={2} className="min-h-[56px] resize-none border-0 bg-transparent px-3 py-2 text-sm shadow-none focus-visible:ring-0" /><div className="flex items-center justify-between gap-2 px-1 pt-1"><div className="flex items-center gap-2">{voiceState === "recording" && <span className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-600"><span className="size-2 animate-pulse rounded-full bg-rose-500" />Recording...</span>}{voiceState === "processing" && <span className="text-xs text-slate-500">Processing voice...</span>}{voiceState === "success" && <span className="text-xs text-emerald-600">Voice request ready</span>}{error && <span className="inline-flex items-center gap-1 text-xs text-rose-600"><AlertCircle className="size-3.5" />{error}</span>}</div><div className="flex items-center gap-2"><Button type="button" variant="ghost" size="icon" onClick={toggleRecording} disabled={loading || voiceState === "processing"} aria-label={voiceState === "recording" ? "Stop recording" : "Start voice input"} className={voiceState === "recording" ? "text-rose-600 hover:bg-rose-50 hover:text-rose-700" : "text-slate-500"}>{voiceState === "recording" ? <Square className="size-4 fill-current" /> : <Mic className="size-5" />}</Button><Button type="button" onClick={() => void submit()} disabled={!input.trim() || loading} aria-label="Send message" className="size-9 rounded-xl bg-slate-950 p-0 text-white hover:bg-blue-700 dark:bg-white dark:text-slate-950 dark:hover:bg-blue-200"><ArrowUp className="size-4" /></Button></div></div></div><p className="mx-auto mt-3 max-w-2xl text-center text-[11px] text-slate-400">Press Enter to send <span className="mx-1">·</span> Shift + Enter for a new line</p></footer>
+        <footer className="border-t border-slate-100 bg-white p-4 sm:p-6 dark:border-slate-800 dark:bg-slate-950">
+          <div className={`mx-auto max-w-2xl rounded-2xl border bg-slate-50 p-2 transition-colors dark:bg-slate-900/80 ${error ? "border-rose-300 dark:border-rose-800" : "border-slate-200 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-500/10 dark:border-slate-700"}`}>
+            <label htmlFor="assistant-input" className="sr-only">Message the AI assistant</label>
+            <Textarea
+              id="assistant-input"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }}
+              placeholder="Type a request..."
+              disabled={loading}
+              rows={2}
+              className="min-h-[56px] resize-none border-0 bg-transparent px-3 py-2 text-sm shadow-none focus-visible:ring-0"
+            />
+            <div className="flex items-center justify-between gap-2 px-1 pt-1">
+              <div className="flex items-center gap-2">
+                {error && <span className="inline-flex items-center gap-1 text-xs text-rose-600"><AlertCircle className="size-3.5" />{error}</span>}
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Voice Chat Button */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setVoiceOpen(true)}
+                  disabled={loading}
+                  aria-label="Open voice input"
+                  className="text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/30"
+                >
+                  <Mic className="size-5" />
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void submit()}
+                  disabled={!input.trim() || loading}
+                  aria-label="Send message"
+                  className="size-9 rounded-xl bg-slate-950 p-0 text-white hover:bg-blue-700 dark:bg-white dark:text-slate-950 dark:hover:bg-blue-200"
+                >
+                  <ArrowUp className="size-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+          <p className="mx-auto mt-3 max-w-2xl text-center text-[11px] text-slate-400">
+            Press Enter to send <span className="mx-1">·</span> Shift + Enter for a new line
+          </p>
+        </footer>
       </section>
+
+      {/* Voice Conversation Modal */}
+      <VoiceConversationModal
+        open={voiceOpen}
+        onClose={() => setVoiceOpen(false)}
+        onTranscript={handleVoiceTranscript}
+      />
     </main>
   );
 }
