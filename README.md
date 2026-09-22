@@ -41,7 +41,7 @@ cp .env.example .env
 | `MONGODB_DATABASE` | Database name used by the app. |
 | `PORT` | Production Express port. |
 | `CLIENT_ORIGIN` | Allowed browser origin for CORS. |
-| `GEMINI_MODEL` | Gemini model supporting tool calling and multimodal input (default: `gemini-2.5-flash`). |
+| `GEMINI_MODEL` | Gemini model supporting tool calling and multimodal input (default: `gemini-3.6-flash`). |
 | `APP_TIMEZONE` | Timezone instruction supplied to the assistant, default `UTC`. |
 
 Production startup validates all required variables and exits with a clear error if they are missing. The Vite development preview can still load without external credentials, but API calls return a safe configuration error until MongoDB and Gemini are configured.

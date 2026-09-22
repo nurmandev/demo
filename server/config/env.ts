@@ -6,7 +6,7 @@ const envSchema = z.object({
   MONGODB_DATABASE: z.string().min(1),
   PORT: z.coerce.number().int().positive().default(3000),
   CLIENT_ORIGIN: z.string().url().default("http://localhost:8080"),
-  GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash"),
+  GEMINI_MODEL: z.string().min(1).default("gemini-3.6-flash"),
   APP_TIMEZONE: z.string().min(1).default("UTC"),
 });
 
