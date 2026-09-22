@@ -7,6 +7,7 @@ import { closeDatabase, connectDatabase } from "./config/database";
 import { AiService } from "./services/ai.service";
 
 async function bootstrap() {
+  process.env.NODE_ENV = process.env.NODE_ENV || "production";
   const env = loadEnv();
   await connectDatabase(env);
   const app = createServer({ env, aiService: new AiService(env) });
@@ -21,7 +22,7 @@ async function bootstrap() {
     res.sendFile(path.join(distPath, "index.html"));
   });
 
-  const server = app.listen(env.PORT, () => {
+  const server = app.listen(env.PORT, "0.0.0.0", () => {
     console.log(`Fusion Assistant server listening on port ${env.PORT}`);
   });
 

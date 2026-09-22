@@ -80,16 +80,66 @@ function MessageItem({ message }: { message: ChatMessage }) {
 }
 
 export default function Index() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem("fusion_chat_messages");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [error, setError] = useState("");
-  const [conversationId, setConversationId] = useState<string>();
+  const [conversationId, setConversationId] = useState<string | undefined>(() => {
+    try {
+      return localStorage.getItem("fusion_conversation_id") || undefined;
+    } catch {
+      return undefined;
+    }
+  });
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const conversationRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      if (messages.length > 0) {
+        localStorage.setItem("fusion_chat_messages", JSON.stringify(messages));
+      } else {
+        localStorage.removeItem("fusion_chat_messages");
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    try {
+      if (conversationId) {
+        localStorage.setItem("fusion_conversation_id", conversationId);
+      } else {
+        localStorage.removeItem("fusion_conversation_id");
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, [conversationId]);
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setConversationId(undefined);
+    setError("");
+    setInput("");
+    try {
+      localStorage.removeItem("fusion_chat_messages");
+      localStorage.removeItem("fusion_conversation_id");
+    } catch {
+      // Ignore
+    }
+  };
 
   useEffect(() => {
     const conversation = conversationRef.current;
@@ -157,9 +207,10 @@ export default function Index() {
         setMessages((current) => [...current, { id: crypto.randomUUID(), role: "tool", content: "Reminder created", status: "success" }]);
       }
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: response.message, status: "success", action: response.action }]);
-    } catch {
-      setError("Something went wrong. Please try again.");
-      toast.error("Unable to reach the assistant.");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unable to reach the assistant.";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -168,7 +219,7 @@ export default function Index() {
   return (
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 text-slate-950 dark:bg-[#0d1117] dark:text-white sm:px-6 sm:py-6">
       <section className="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-5xl flex-col overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_24px_80px_-32px_rgba(15,23,42,0.28)] dark:border-slate-800 dark:bg-slate-950 sm:min-h-[calc(100vh-3rem)]">
-        <NotchNavbar />
+        <NotchNavbar onNewChat={handleNewChat} hasMessages={messages.length > 0} />
 
         <div ref={conversationRef} role="log" aria-live="polite" tabIndex={0} className="min-h-0 flex-1 overflow-y-auto bg-[linear-gradient(to_bottom,rgba(248,250,252,0.6),rgba(255,255,255,0))] dark:bg-[linear-gradient(to_bottom,rgba(15,23,42,0.35),rgba(2,6,23,0))]">
           {messages.length === 0 ? <div className="flex min-h-full items-center justify-center px-5 py-12 sm:px-8"><div className="w-full max-w-xl text-center"><div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300"><BrainCircuit className="size-6" /></div><h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">How can I help?</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">Type or speak a request to get started. I’ll turn it into a useful action.</p><div className="mt-8 grid gap-3 text-left sm:grid-cols-2">{examples.map((example) => <button key={example} type="button" onClick={() => { setInput(example); void submit(example); }} className="group rounded-2xl border border-slate-200 bg-white p-4 text-left text-sm leading-5 text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"><span className="mb-3 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 group-hover:text-blue-600">Try an example</span>{example}</button>)}</div></div></div> : <div className="py-6">{messages.map((message) => <MessageItem key={message.id} message={message} />)}{loading && <div className="mx-auto flex w-full max-w-2xl gap-3 px-4 py-3 sm:px-8"><div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300"><BrainCircuit className="size-4" /></div><div className="rounded-2xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900"><span className="inline-flex items-center gap-2"><span className="flex gap-1"><i className="size-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.2s]" /><i className="size-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.1s]" /><i className="size-1.5 animate-bounce rounded-full bg-blue-500" /></span>AI is thinking</span></div></div>}</div>}

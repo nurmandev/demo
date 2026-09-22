@@ -25,24 +25,47 @@ export function createServer(options: { env?: AppEnv; aiService?: AiService } = 
         try {
           await connectDatabase(env);
         } catch (error) {
-          console.error("MongoDB connection failed", { name: error instanceof Error ? error.name : "unknown" });
+          console.error("MongoDB connection failed", { message: error instanceof Error ? error.message : String(error) });
           throw new AppError("DATABASE_UNAVAILABLE", "The database is unavailable. Please try again later.", 503);
         }
         const aiService = new AiService(env);
         return { aiService, chatService: new ChatService(aiService) };
-      })();
+      })().catch((error) => {
+        runtimePromise = undefined;
+        throw error;
+      });
     }
     return runtimePromise;
   };
 
   app.disable("x-powered-by");
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy:
+        process.env.NODE_ENV === "production"
+          ? {
+              directives: {
+                ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+                "img-src": ["'self'", "data:", "blob:", "https:"],
+                "connect-src": ["'self'", "https:", "wss:", "ws:"],
+              },
+            }
+          : false,
+    })
+  );
   app.use(cors({ origin: options.env?.CLIENT_ORIGIN || process.env.CLIENT_ORIGIN || "http://localhost:8080" }));
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
-  app.get("/api/health", (_req, res) => {
+  app.get("/api/health", async (_req, res) => {
     const configured = options.env ? true : hasExternalConfiguration();
+    if (configured && !isDatabaseConnected()) {
+      try {
+        await getRuntime();
+      } catch {
+        // Retain degraded status below
+      }
+    }
     res.status(configured && isDatabaseConnected() ? 200 : 503).json({
       status: configured && isDatabaseConnected() ? "ok" : "degraded",
       database: isDatabaseConnected() ? "connected" : configured ? "disconnected" : "not_configured",

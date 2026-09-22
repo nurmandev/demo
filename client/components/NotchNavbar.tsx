@@ -11,7 +11,7 @@ function RailLines() {
   );
 }
 
-export function NotchNavbar() {
+export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void; hasMessages?: boolean } = {}) {
   const navigate = useNavigate();
 
   return (
@@ -38,8 +38,17 @@ export function NotchNavbar() {
           <div className="absolute inset-0 bg-slate-50 dark:bg-slate-950" style={{ clipPath: 'path("M 0 0 H 50 V 40 C 25 40 25 64 0 64 Z")' }} />
         </div>
       </div>
-      <div className="relative -ml-px flex h-10 min-w-0 flex-1 items-center justify-end bg-slate-50 px-2 dark:bg-slate-950 sm:px-6">
+      <div className="relative -ml-px flex h-10 min-w-0 flex-1 items-center justify-end gap-2 bg-slate-50 px-2 dark:bg-slate-950 sm:px-6">
         <RailLines />
+        {hasMessages && onNewChat && (
+          <button
+            type="button"
+            onClick={onNewChat}
+            className="relative z-10 rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+          >
+            New chat
+          </button>
+        )}
         <GenerateButton label="Login" activeLabel="Login" onClick={() => navigate("/login")} className="relative z-10 h-8 w-[88px] border border-slate-400/60 text-xs shadow-none sm:h-9 sm:w-[94px] sm:text-sm" aria-label="Open login page" />
       </div>
     </header>

@@ -17,12 +17,24 @@ export class AiService {
       return await this.client.chat.completions.create({
         model: this.env.OPENAI_MODEL,
         temperature: 0.2,
-        messages: [{ role: "system", content: `${systemPrompt} Current timezone: ${this.env.APP_TIMEZONE}.` }, ...messages.map(({ timestamp: _timestamp, ...message }) => message)],
+        messages: [
+          {
+            role: "system",
+            content: `${systemPrompt} Current timestamp: ${new Date().toISOString()}. Current timezone: ${this.env.APP_TIMEZONE}.`,
+          },
+          ...messages.map(({ timestamp: _timestamp, ...message }) => message),
+        ],
         tools: [createReminderDefinition],
         tool_choice: "auto",
       });
     } catch (error) {
-      console.error("OpenAI chat request failed", { name: error instanceof Error ? error.name : "unknown" });
+      console.error("OpenAI chat request failed", { message: error instanceof Error ? error.message : String(error) });
+      const isOpenAiError = error && typeof error === "object" && "status" in error;
+      const status = isOpenAiError ? (error as { status?: number }).status : undefined;
+      const code = isOpenAiError ? (error as { code?: string }).code : undefined;
+      if (status === 429 || code === "insufficient_quota" || code === "credit_balance_exhausted") {
+        throw new AppError("AI_QUOTA_EXCEEDED", "OpenAI quota or credit limit exceeded. Please add credits to your OpenAI account.", 502);
+      }
       throw new AppError("AI_REQUEST_FAILED", "Unable to process your request right now.", 502);
     }
   }
@@ -32,7 +44,7 @@ export class AiService {
       const upload = await OpenAI.toFile(file.buffer, file.originalname, { type: file.mimetype });
       return await this.client.audio.transcriptions.create({ file: upload, model: this.env.OPENAI_TRANSCRIPTION_MODEL });
     } catch (error) {
-      console.error("OpenAI transcription failed", { name: error instanceof Error ? error.name : "unknown" });
+      console.error("OpenAI transcription failed", { message: error instanceof Error ? error.message : String(error) });
       throw new AppError("TRANSCRIPTION_FAILED", "Unable to transcribe that recording.", 502);
     }
   }
