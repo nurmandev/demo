@@ -1,4 +1,7 @@
 import { useNavigate } from "react-router-dom";
+import { LogOut, User } from "lucide-react";
+import { toast } from "sonner";
+import { useSession, signOut } from "@/lib/auth-client";
 
 function RailLines() {
   return (
@@ -11,6 +14,17 @@ function RailLines() {
 
 export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void; hasMessages?: boolean } = {}) {
   const navigate = useNavigate();
+  const { data: session } = useSession();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast.success("Signed out successfully.");
+      navigate("/login");
+    } catch {
+      toast.error("Failed to sign out.");
+    }
+  };
 
   return (
     <header className="relative z-10 flex h-20 w-full bg-transparent" aria-label="Miracle Edem navigation">
@@ -37,16 +51,33 @@ export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void
           <div className="absolute inset-0 bg-slate-50 dark:bg-slate-950" style={{ clipPath: 'path("M 0 0 H 56 V 56 C 28 56 28 80 0 80 Z")' }} />
         </div>
       </div>
-      <div className="relative -ml-px flex h-14 min-w-0 flex-1 items-center justify-end gap-3 bg-slate-50 px-3 sm:px-8 dark:bg-slate-950">
+      <div className="relative -ml-px flex h-14 min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3 bg-slate-50 px-2 sm:px-8 dark:bg-slate-950">
         <RailLines />
-        {hasMessages && onNewChat ? (
+        {hasMessages && onNewChat && (
           <button
             type="button"
             onClick={onNewChat}
-            className="relative z-20 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/70 hover:text-slate-900 active:scale-95 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white cursor-pointer"
+            className="relative z-20 rounded-xl px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/70 hover:text-slate-900 active:scale-95 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white cursor-pointer shrink-0"
           >
             New chat
           </button>
+        )}
+        {session?.user ? (
+          <div className="relative z-20 flex items-center gap-1.5 sm:gap-2">
+            <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <User className="size-3.5" />
+              {session.user.name || session.user.email}
+            </span>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              aria-label="Sign out"
+              className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-400 hover:bg-slate-50 active:scale-95 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-700 cursor-pointer shrink-0"
+            >
+              <LogOut className="size-3.5" />
+              <span>Logout</span>
+            </button>
+          </div>
         ) : (
           <button
             type="button"
@@ -61,4 +92,3 @@ export function NotchNavbar({ onNewChat, hasMessages }: { onNewChat?: () => void
     </header>
   );
 }
-

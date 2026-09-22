@@ -10,7 +10,7 @@ import { AppError } from "../utils/errors";
 export class ChatService {
   constructor(private readonly aiService: AiService) {}
 
-  async send(message: string, conversationId?: string): Promise<ChatResponse> {
+  async send(message: string, conversationId?: string, userId?: string): Promise<ChatResponse> {
     const conversations = new ConversationRepository(getDatabase());
     const reminders = new ReminderRepository(getDatabase());
 
@@ -53,6 +53,7 @@ export class ChatService {
           reminders,
           toolCall.args,
           `${conversation._id}:${toolCall.name}:${i}`,
+          userId,
         );
 
         const toolResponse = {

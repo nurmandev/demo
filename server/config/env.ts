@@ -8,6 +8,8 @@ const envSchema = z.object({
   CLIENT_ORIGIN: z.string().url().default("http://localhost:8080"),
   GEMINI_MODEL: z.string().min(1).default("gemini-flash-latest"),
   APP_TIMEZONE: z.string().min(1).default("UTC"),
+  BETTER_AUTH_SECRET: z.string().min(1).default("default-development-secret-change-in-production"),
+  BETTER_AUTH_URL: z.string().url().default("http://localhost:8080"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

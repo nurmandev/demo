@@ -32,6 +32,7 @@ export async function executeCreateReminder(
   repository: ReminderRepository,
   rawArguments: unknown,
   idempotencyKey: string,
+  userId?: string,
 ): Promise<ReminderAction> {
   let parsed = rawArguments;
   if (typeof rawArguments === "string") {
@@ -45,5 +46,5 @@ export async function executeCreateReminder(
   if (!input.success || Number.isNaN(new Date(input.data.scheduledAt).getTime())) {
     throw new AppError("INVALID_TOOL_ARGUMENTS", "The assistant returned invalid reminder details.", 422);
   }
-  return repository.create({ title: input.data.title, scheduledAt: new Date(input.data.scheduledAt), idempotencyKey });
+  return repository.create({ title: input.data.title, scheduledAt: new Date(input.data.scheduledAt), idempotencyKey, userId });
 }

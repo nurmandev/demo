@@ -4,6 +4,7 @@ import type { ReminderAction } from "@shared/api";
 
 interface ReminderDocument {
   _id: string;
+  userId?: string;
   title: string;
   scheduledAt: Date;
   createdAt: Date;
@@ -15,13 +16,14 @@ interface ReminderDocument {
 export class ReminderRepository {
   constructor(private readonly db: Db) {}
 
-  async create(input: { title: string; scheduledAt: Date; idempotencyKey: string }): Promise<ReminderAction> {
+  async create(input: { title: string; scheduledAt: Date; idempotencyKey: string; userId?: string }): Promise<ReminderAction> {
     const collection = this.db.collection<ReminderDocument>("reminders");
     const existing = await collection.findOne({ idempotencyKey: input.idempotencyKey });
     if (existing) return this.toAction(existing);
     const now = new Date();
     const document: ReminderDocument = {
       _id: randomUUID(),
+      userId: input.userId,
       title: input.title,
       scheduledAt: input.scheduledAt,
       createdAt: now,

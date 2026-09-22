@@ -37,6 +37,11 @@ export function getDatabase(): Db {
   return database;
 }
 
+export function getMongoClient(): MongoClient {
+  if (!client) throw new Error("Database client is not connected");
+  return client;
+}
+
 export function isDatabaseConnected() {
   return Boolean(database);
 }

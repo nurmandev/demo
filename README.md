@@ -1,23 +1,38 @@
 # Miracle Edem
 
-A focused React and TypeScript technical-evaluation prototype for the flow:
+A focused React and TypeScript technical-evaluation application featuring:
 
-**Voice/Text → Google Gemini → controlled tool call → MongoDB reminder → Google Gemini response**
+**Register/Login → Better Auth Session → AI Assistant → Voice/Text → Google Gemini → controlled tool call → MongoDB reminder (user-isolated) → Google Gemini response**
 
-The frontend is intentionally one assistant screen. It has no authentication, dashboard, reminder history, or unrelated product features.
+---
+
+## Authentication
+
+Authentication is implemented using **Better Auth** with the official MongoDB adapter (`better-auth/adapters/mongodb`).
+
+- **Registration Flow (`/register`)**: Users register with Full Name, Email, Password, and Confirm Password. Validation runs on both frontend and backend. Creates real users in MongoDB.
+- **Login Flow (`/login`)**: Secure credential verification via Better Auth (`signIn.email`). Generates real session tokens managed via secure cookies.
+- **Session Management**: Checked via `useSession()`. Protects the AI Assistant workspace—unauthenticated users are automatically redirected to `/login`.
+- **Logout**: Handled via `signOut()`, terminating the session and clearing cookies.
+- **Data Isolation**: Reminders stored in MongoDB are explicitly scoped to the authenticated `userId` derived from the verified session.
+
+---
 
 ## Architecture
 
-- `client/` — React SPA with the assistant conversation and composer.
-- `client/services/api.ts` — the only frontend API client; it sends chat and audio requests to the backend.
-- `server/config/` — validated environment configuration and a reusable MongoDB connection.
-- `server/routes/` and `server/controllers/` — small HTTP adapters for chat and transcription.
-- `server/services/` — Google Gemini and chat orchestration logic.
-- `server/tools/` — explicit tool definitions and validated tool execution.
-- `server/repositories/` — MongoDB persistence for conversations and reminders.
-- `shared/api.ts` — request and response contracts shared by client and server.
+- `client/` — React SPA with the assistant conversation, voice conversation modal, register, and login pages.
+- `client/lib/auth-client.ts` — Better Auth client (`createAuthClient`) providing `signIn`, `signUp`, `signOut`, and `useSession`.
+- `client/services/api.ts` — Frontend API client for chat and audio transcription with `credentials: "include"`.
+- `server/auth.ts` — Better Auth configuration with MongoDB adapter.
+- `server/middleware/auth.ts` — `requireAuth` middleware validating Better Auth session cookies on protected endpoints like `POST /api/chat`.
+- `server/config/` — Environment validation and shared MongoDB connection.
+- `server/routes/` and `server/controllers/` — Small HTTP adapters for authentication, chat, and audio transcription.
+- `server/services/` — Google Gemini tool calling and chat orchestration.
+- `server/tools/` — Explicit tool definitions (`createReminder`) and execution.
+- `server/repositories/` — MongoDB persistence for conversations and user-associated reminders.
+- `shared/api.ts` — Request and response contracts shared by client and server.
 
-The backend uses Express because it is already part of the starter and keeps the evaluation focused. MongoDB is accessed through the official driver. Google Gemini tool calling is isolated in `AiService`; the chat service owns the tool loop and never gives the model arbitrary function access.
+---
 
 ## Prerequisites
 
@@ -25,6 +40,8 @@ The backend uses Express because it is already part of the starter and keeps the
 - pnpm
 - A running MongoDB instance or MongoDB Atlas database
 - A Google Gemini API key with access to the configured Gemini model
+
+---
 
 ## Configuration
 
@@ -36,116 +53,49 @@ cp .env.example .env
 
 | Variable | Purpose |
 | --- | --- |
-| `GEMINI_API_KEY` | Backend-only Google Gemini secret. |
+| `BETTER_AUTH_SECRET` | Secret key for Better Auth session encryption. |
+| `BETTER_AUTH_URL` | Base URL for authentication endpoints (e.g. `http://localhost:8080` or production domain). |
+| `GEMINI_API_KEY` | Backend-only Google Gemini secret key. |
 | `MONGODB_URI` | MongoDB connection string. |
 | `MONGODB_DATABASE` | Database name used by the app. |
 | `PORT` | Production Express port. |
-| `CLIENT_ORIGIN` | Allowed browser origin for CORS. |
-| `GEMINI_MODEL` | Gemini model supporting tool calling and multimodal input (default: `gemini-flash-latest`). |
-| `APP_TIMEZONE` | Timezone instruction supplied to the assistant, default `UTC`. |
+| `CLIENT_ORIGIN` | Allowed browser origin for CORS with credentials. |
+| `GEMINI_MODEL` | Gemini model supporting tool calling (default: `gemini-flash-latest`). |
+| `APP_TIMEZONE` | Timezone instruction supplied to the assistant (default: `UTC`). |
 
-Production startup validates all required variables and exits with a clear error if they are missing. The Vite development preview can still load without external credentials, but API calls return a safe configuration error until MongoDB and Gemini are configured.
+---
 
-## Install and run
+## Install and Run
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-`pnpm dev` serves the SPA and Express API through Vite on port 8080. For the production-style server:
+`pnpm dev` serves the SPA and Express API through Vite on port 8080. For the production server:
 
 ```bash
 pnpm build
 pnpm start
 ```
 
-Production startup connects to MongoDB before accepting requests. The server closes the HTTP listener and MongoDB client on `SIGINT` and `SIGTERM`.
+---
 
-## API
+## API Endpoints
 
 ### `GET /api/health`
+Returns `200` only when configuration is valid and MongoDB is connected.
 
-Returns `200` only when required external configuration is present and MongoDB is connected. Otherwise it returns `503` with a degraded status.
+### `ALL /api/auth/*`
+Better Auth endpoint handler for registration (`/sign-up/email`), login (`/sign-in/email`), logout (`/sign-out`), and session checking (`/get-session`).
 
-```json
-{
-  "status": "ok",
-  "database": "connected"
-}
-```
-
-### `POST /api/chat`
-
-Validates the message, persists it to a conversation, calls Google Gemini, executes only the registered `createReminder` tool when requested, persists the tool result, then asks Google Gemini for the final response.
-
-Request:
-
-```json
-{
-  "message": "Remind me tomorrow at 10 AM to call John.",
-  "conversationId": "optional-uuid"
-}
-```
-
-Response after a real reminder is persisted:
-
-```json
-{
-  "conversationId": "uuid",
-  "message": {
-    "role": "assistant",
-    "content": "..."
-  },
-  "action": {
-    "type": "reminder_created",
-    "id": "uuid",
-    "title": "Call John",
-    "scheduledAt": "2026-09-22T10:00:00.000Z",
-    "status": "active"
-  }
-}
-```
-
-The backend validates tool arguments with Zod, requires an ISO-8601 datetime with an explicit offset, and uses a conversation/tool-call idempotency key to avoid duplicate reminder inserts on retries.
+### `POST /api/chat` *(Protected)*
+Requires an authenticated Better Auth session cookie. Associates created reminders with the authenticated user ID.
 
 ### `POST /api/transcription`
+Accepts `multipart/form-data` with audio for Google Gemini speech-to-text.
 
-Accepts `multipart/form-data` with an `audio` field. Audio is held in memory only, limited to 10 MB, checked against supported MIME types, and sent to Google Gemini for native audio transcription. No Gemini key reaches the browser.
-
-```json
-{
-  "text": "Remind me tomorrow at 10 AM to call John"
-}
-```
-
-The frontend records actual microphone audio with `MediaRecorder`, sends it to this endpoint, places the returned transcript in the composer, and lets the user edit it before sending.
-
-## End-to-end tool flow
-
-1. The browser posts the user message to `/api/chat`.
-2. The backend stores the user message in MongoDB.
-3. Google Gemini receives the conversation and the strict `createReminder` schema.
-4. If Google Gemini requests the tool, the backend validates its arguments.
-5. `ReminderRepository` inserts the reminder in MongoDB with an idempotency key.
-6. The stored action is sent back to Google Gemini as the tool result.
-7. Google Gemini writes the final natural-language response.
-8. The backend returns the final response and the actual stored action.
-9. The UI renders the response and action card from that response.
-
-If MongoDB or Google Gemini fails, the backend returns a safe structured error and never claims that a reminder was created.
-
-## Security and tradeoffs
-
-- Secrets are loaded only from environment variables and are excluded from git.
-- CORS uses the configured origin rather than `*`.
-- JSON bodies are limited to 1 MB; audio uploads are limited to 10 MB.
-- Generated tool arguments are validated before persistence.
-- Only `createReminder` is registered; unknown model-requested tools are rejected.
-- User content is not logged as raw payloads.
-- This prototype stores a compact conversation record and does not add auth, queues, WebSockets, background jobs, or reminder management.
-- The browser uses a request/response lifecycle instead of simulated streaming. The loading state reflects the real pending HTTP request.
-- The configured timezone is supplied to Google Gemini and all persisted reminder dates are ISO UTC values. For production multi-user timezone support, timezone should become explicit user input or account configuration.
+---
 
 ## Verification
 
@@ -154,5 +104,3 @@ pnpm typecheck
 pnpm test
 pnpm build
 ```
-
-The automated tests cover request validation, strict reminder argument validation, idempotent reminder persistence, and safe error behavior. Full live acceptance testing requires valid Google Gemini credentials and a reachable MongoDB instance.

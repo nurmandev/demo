@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, ArrowUp, Bot, BrainCircuit, Check, Clock3, Mic, UserRound, WandSparkles } from "lucide-react";
+import { AlertCircle, ArrowUp, Bot, BrainCircuit, Check, Clock3, Loader2, Mic, UserRound, WandSparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { sendMessage } from "@/services/api";
 import { NotchNavbar } from "@/components/NotchNavbar";
 import { VoiceConversationModal } from "@/components/VoiceConversationModal";
+import { useSession } from "@/lib/auth-client";
 import type { ChatMessage, ReminderAction } from "@/types/chat";
 
 const examples = [
@@ -79,6 +81,9 @@ function MessageItem({ message }: { message: ChatMessage }) {
 }
 
 export default function Index() {
+  const navigate = useNavigate();
+  const { data: session, isPending: sessionLoading } = useSession();
+
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = localStorage.getItem("fusion_chat_messages");
@@ -99,6 +104,13 @@ export default function Index() {
     }
   });
   const conversationRef = useRef<HTMLDivElement>(null);
+
+  // Protected route enforcement
+  useEffect(() => {
+    if (!sessionLoading && !session?.user) {
+      navigate("/login");
+    }
+  }, [session, sessionLoading, navigate]);
 
   useEffect(() => {
     try {
@@ -142,10 +154,8 @@ export default function Index() {
     if (conversation) conversation.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
-  // Called when voice modal confirms transcript — put it in input and auto-submit
   const handleVoiceTranscript = (text: string) => {
     setInput(text);
-    // Submit after React flushes the state update
     setTimeout(() => void submit(text), 0);
   };
 
@@ -165,6 +175,11 @@ export default function Index() {
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: response.message, status: "success", action: response.action }]);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unable to reach the assistant.";
+      if (errorMessage.toLowerCase().includes("unauthorized") || errorMessage.toLowerCase().includes("authentication")) {
+        toast.error("Your session has expired. Please log in again.");
+        navigate("/login");
+        return;
+      }
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -172,13 +187,84 @@ export default function Index() {
     }
   };
 
+  if (sessionLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f4f7fb] dark:bg-[#0d1117]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="size-8 animate-spin text-blue-600" />
+          <p className="text-xs font-medium text-slate-500">Checking authentication...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!session?.user) {
+    return null;
+  }
+
   return (
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 text-slate-950 dark:bg-[#0d1117] dark:text-white sm:px-6 sm:py-6">
       <section className="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-5xl flex-col overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_24px_80px_-32px_rgba(15,23,42,0.28)] dark:border-slate-800 dark:bg-slate-950 sm:min-h-[calc(100vh-3rem)]">
         <NotchNavbar onNewChat={handleNewChat} hasMessages={messages.length > 0} />
 
         <div ref={conversationRef} role="log" aria-live="polite" tabIndex={0} className="min-h-0 flex-1 overflow-y-auto bg-[linear-gradient(to_bottom,rgba(248,250,252,0.6),rgba(255,255,255,0))] dark:bg-[linear-gradient(to_bottom,rgba(15,23,42,0.35),rgba(2,6,23,0))]">
-          {messages.length === 0 ? <div className="flex min-h-full items-center justify-center px-5 py-12 sm:px-8"><div className="w-full max-w-xl text-center"><div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-blue-50 p-2.5 dark:bg-blue-950/50"><img src="/favicon.svg" alt="Miracle Edem" className="size-8" /></div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Miracle Edem</p><h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">How can I help?</h2><p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">Type or speak a request to get started. I'll turn it into a useful action.</p><div className="mt-8 grid gap-3 text-left sm:grid-cols-2">{examples.map((example) => <button key={example} type="button" onClick={() => { setInput(example); void submit(example); }} className="group rounded-2xl border border-slate-200 bg-white p-4 text-left text-sm leading-5 text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"><span className="mb-3 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 group-hover:text-blue-600">Try an example</span>{example}</button>)}</div></div></div> : <div className="py-6">{messages.map((message) => <MessageItem key={message.id} message={message} />)}{loading && <div className="mx-auto flex w-full max-w-2xl gap-3 px-4 py-3 sm:px-8"><div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300"><BrainCircuit className="size-4" /></div><div className="rounded-2xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900"><span className="inline-flex items-center gap-2"><span className="flex gap-1"><i className="size-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.2s]" /><i className="size-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.1s]" /><i className="size-1.5 animate-bounce rounded-full bg-blue-500" /></span>AI is thinking</span></div></div>}</div>}
+          {messages.length === 0 ? (
+            <div className="flex min-h-full items-center justify-center px-5 py-12 sm:px-8">
+              <div className="w-full max-w-xl text-center">
+                <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-blue-50 p-2.5 dark:bg-blue-950/50">
+                  <img src="/favicon.svg" alt="Miracle Edem" className="size-8" />
+                </div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
+                  Welcome, {session.user.name || session.user.email}
+                </p>
+                <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">How can I help?</h2>
+                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
+                  Type or speak a request to get started. I'll turn it into a useful action.
+                </p>
+                <div className="mt-8 grid gap-3 text-left sm:grid-cols-2">
+                  {examples.map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => {
+                        setInput(example);
+                        void submit(example);
+                      }}
+                      className="group rounded-2xl border border-slate-200 bg-white p-4 text-left text-sm leading-5 text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                    >
+                      <span className="mb-3 block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 group-hover:text-blue-600">
+                        Try an example
+                      </span>
+                      {example}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="py-6">
+              {messages.map((message) => (
+                <MessageItem key={message.id} message={message} />
+              ))}
+              {loading && (
+                <div className="mx-auto flex w-full max-w-2xl gap-3 px-4 py-3 sm:px-8">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300">
+                    <BrainCircuit className="size-4" />
+                  </div>
+                  <div className="rounded-2xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <span className="inline-flex items-center gap-2">
+                      <span className="flex gap-1">
+                        <i className="size-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.2s]" />
+                        <i className="size-1.5 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.1s]" />
+                        <i className="size-1.5 animate-bounce rounded-full bg-blue-500" />
+                      </span>
+                      AI is thinking
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <footer className="border-t border-slate-100 bg-white p-4 sm:p-6 dark:border-slate-800 dark:bg-slate-950">
@@ -188,7 +274,12 @@ export default function Index() {
               id="assistant-input"
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void submit();
+                }
+              }}
               placeholder="Type a request..."
               disabled={loading}
               rows={2}
@@ -199,7 +290,6 @@ export default function Index() {
                 {error && <span className="inline-flex items-center gap-1 text-xs text-rose-600"><AlertCircle className="size-3.5" />{error}</span>}
               </div>
               <div className="flex items-center gap-2">
-                {/* Voice Chat Button */}
                 <Button
                   type="button"
                   variant="ghost"

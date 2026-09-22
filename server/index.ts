@@ -12,24 +12,29 @@ import { transcriptionRouter } from "./routes/transcription";
 import { AppError } from "./utils/errors";
 import { errorHandler } from "./middleware/error-handler";
 
+import { toNodeHandler } from "better-auth/node";
+import { getAuth } from "./auth";
+import { requireAuth } from "./middleware/auth";
+
 export function createServer(options: { env?: AppEnv; aiService?: AiService } = {}) {
   const app = express();
+  const baseEnv = options.env || loadEnv();
   const configuredRuntime = options.aiService
-    ? Promise.resolve({ aiService: options.aiService, chatService: new ChatService(options.aiService) })
+    ? Promise.resolve({ aiService: options.aiService, chatService: new ChatService(options.aiService), env: baseEnv })
     : undefined;
   let runtimePromise = configuredRuntime;
   const getRuntime = () => {
     if (!runtimePromise) {
       runtimePromise = (async () => {
-        const env = loadEnv();
+        const env = options.env || loadEnv();
         try {
           await connectDatabase(env);
         } catch (error) {
           console.error("MongoDB connection failed", { message: error instanceof Error ? error.message : String(error) });
           throw new AppError("DATABASE_UNAVAILABLE", "The database is unavailable. Please try again later.", 503);
         }
-        const aiService = new AiService(env);
-        return { aiService, chatService: new ChatService(aiService) };
+        const aiService = options.aiService || new AiService(env);
+        return { aiService, chatService: new ChatService(aiService), env };
       })().catch((error) => {
         runtimePromise = undefined;
         throw error;
@@ -53,7 +58,24 @@ export function createServer(options: { env?: AppEnv; aiService?: AiService } = 
           : false,
     })
   );
-  app.use(cors({ origin: options.env?.CLIENT_ORIGIN || process.env.CLIENT_ORIGIN || "http://localhost:8080" }));
+  app.use(
+    cors({
+      origin: options.env?.CLIENT_ORIGIN || process.env.CLIENT_ORIGIN || "http://localhost:8080",
+      credentials: true,
+    })
+  );
+
+  // Better Auth handler mounted at /api/auth
+  app.use("/api/auth", async (req, res, next) => {
+    try {
+      const runtime = await getRuntime();
+      const auth = getAuth(runtime.env);
+      return toNodeHandler(auth)(req, res);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
@@ -76,7 +98,12 @@ export function createServer(options: { env?: AppEnv; aiService?: AiService } = 
     if (req.path !== "/chat" && req.path !== "/transcription") return next();
     try {
       const runtime = await getRuntime();
-      const router = req.path === "/chat" ? chatRouter(runtime.chatService) : transcriptionRouter(runtime.aiService);
+      if (req.path === "/chat") {
+        return requireAuth(runtime.env)(req, res, () => {
+          return chatRouter(runtime.chatService)(req, res, next);
+        });
+      }
+      const router = transcriptionRouter(runtime.aiService);
       return router(req, res, next);
     } catch (error) {
       next(error instanceof AppError ? error : new AppError("SERVICE_NOT_CONFIGURED", "The backend is not configured for AI requests.", 503));

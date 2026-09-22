@@ -14,6 +14,7 @@ export async function sendMessage(message: string, conversationId?: string): Pro
   const response = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({ message, conversationId }),
   });
   const data = await parseResponse<ApiChatResponse>(response);
@@ -24,7 +25,11 @@ export async function sendMessage(message: string, conversationId?: string): Pro
 export async function transcribeAudio(audio: Blob): Promise<string> {
   const formData = new FormData();
   formData.append("audio", audio, "recording.webm");
-  const response = await fetch("/api/transcription", { method: "POST", body: formData });
+  const response = await fetch("/api/transcription", {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
   const data = await parseResponse<TranscriptionResponse>(response);
   if (!data?.text) throw new Error("No transcript was returned");
   return data.text;
