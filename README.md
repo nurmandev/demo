@@ -2,7 +2,7 @@
 
 A focused React and TypeScript technical-evaluation prototype for the flow:
 
-**Voice/Text → OpenAI → controlled tool call → MongoDB reminder → OpenAI response**
+**Voice/Text → Google Gemini → controlled tool call → MongoDB reminder → Google Gemini response**
 
 The frontend is intentionally one assistant screen. It has no authentication, dashboard, reminder history, or unrelated product features.
 
@@ -12,19 +12,19 @@ The frontend is intentionally one assistant screen. It has no authentication, da
 - `client/services/api.ts` — the only frontend API client; it sends chat and audio requests to the backend.
 - `server/config/` — validated environment configuration and a reusable MongoDB connection.
 - `server/routes/` and `server/controllers/` — small HTTP adapters for chat and transcription.
-- `server/services/` — OpenAI and chat orchestration logic.
+- `server/services/` — Google Gemini and chat orchestration logic.
 - `server/tools/` — explicit tool definitions and validated tool execution.
 - `server/repositories/` — MongoDB persistence for conversations and reminders.
 - `shared/api.ts` — request and response contracts shared by client and server.
 
-The backend uses Express because it is already part of the starter and keeps the evaluation focused. MongoDB is accessed through the official driver. OpenAI Chat Completions tool calling is isolated in `AiService`; the chat service owns the tool loop and never gives the model arbitrary function access.
+The backend uses Express because it is already part of the starter and keeps the evaluation focused. MongoDB is accessed through the official driver. Google Gemini tool calling is isolated in `AiService`; the chat service owns the tool loop and never gives the model arbitrary function access.
 
 ## Prerequisites
 
 - Node.js 20+
 - pnpm
 - A running MongoDB instance or MongoDB Atlas database
-- An OpenAI API key with access to the configured chat and transcription models
+- A Google Gemini API key with access to the configured Gemini model
 
 ## Configuration
 
@@ -36,16 +36,15 @@ cp .env.example .env
 
 | Variable | Purpose |
 | --- | --- |
-| `OPENAI_API_KEY` | Backend-only OpenAI secret. |
+| `GEMINI_API_KEY` | Backend-only Google Gemini secret. |
 | `MONGODB_URI` | MongoDB connection string. |
 | `MONGODB_DATABASE` | Database name used by the app. |
 | `PORT` | Production Express port. |
 | `CLIENT_ORIGIN` | Allowed browser origin for CORS. |
-| `OPENAI_MODEL` | Chat model supporting tool calling. |
-| `OPENAI_TRANSCRIPTION_MODEL` | OpenAI audio transcription model. |
+| `GEMINI_MODEL` | Gemini model supporting tool calling and multimodal input (default: `gemini-2.5-flash`). |
 | `APP_TIMEZONE` | Timezone instruction supplied to the assistant, default `UTC`. |
 
-Production startup validates all required variables and exits with a clear error if they are missing. The Vite development preview can still load without external credentials, but API calls return a safe configuration error until MongoDB and OpenAI are configured.
+Production startup validates all required variables and exits with a clear error if they are missing. The Vite development preview can still load without external credentials, but API calls return a safe configuration error until MongoDB and Gemini are configured.
 
 ## Install and run
 
@@ -78,7 +77,7 @@ Returns `200` only when required external configuration is present and MongoDB i
 
 ### `POST /api/chat`
 
-Validates the message, persists it to a conversation, calls OpenAI, executes only the registered `createReminder` tool when requested, persists the tool result, then asks OpenAI for the final response.
+Validates the message, persists it to a conversation, calls Google Gemini, executes only the registered `createReminder` tool when requested, persists the tool result, then asks Google Gemini for the final response.
 
 Request:
 
@@ -112,7 +111,7 @@ The backend validates tool arguments with Zod, requires an ISO-8601 datetime wit
 
 ### `POST /api/transcription`
 
-Accepts `multipart/form-data` with an `audio` field. Audio is held in memory only, limited to 10 MB, checked against supported MIME types, and sent to OpenAI transcription. No OpenAI key reaches the browser.
+Accepts `multipart/form-data` with an `audio` field. Audio is held in memory only, limited to 10 MB, checked against supported MIME types, and sent to Google Gemini for native audio transcription. No Gemini key reaches the browser.
 
 ```json
 {
@@ -126,15 +125,15 @@ The frontend records actual microphone audio with `MediaRecorder`, sends it to t
 
 1. The browser posts the user message to `/api/chat`.
 2. The backend stores the user message in MongoDB.
-3. OpenAI receives the conversation and the strict `createReminder` schema.
-4. If OpenAI requests the tool, the backend validates its JSON arguments.
+3. Google Gemini receives the conversation and the strict `createReminder` schema.
+4. If Google Gemini requests the tool, the backend validates its arguments.
 5. `ReminderRepository` inserts the reminder in MongoDB with an idempotency key.
-6. The stored action is sent back to OpenAI as the tool result.
-7. OpenAI writes the final natural-language response.
+6. The stored action is sent back to Google Gemini as the tool result.
+7. Google Gemini writes the final natural-language response.
 8. The backend returns the final response and the actual stored action.
 9. The UI renders the response and action card from that response.
 
-If MongoDB or OpenAI fails, the backend returns a safe structured error and never claims that a reminder was created.
+If MongoDB or Google Gemini fails, the backend returns a safe structured error and never claims that a reminder was created.
 
 ## Security and tradeoffs
 
@@ -146,7 +145,7 @@ If MongoDB or OpenAI fails, the backend returns a safe structured error and neve
 - User content is not logged as raw payloads.
 - This prototype stores a compact conversation record and does not add auth, queues, WebSockets, background jobs, or reminder management.
 - The browser uses a request/response lifecycle instead of simulated streaming. The loading state reflects the real pending HTTP request.
-- The configured timezone is supplied to OpenAI and all persisted reminder dates are ISO UTC values. For production multi-user timezone support, timezone should become explicit user input or account configuration.
+- The configured timezone is supplied to Google Gemini and all persisted reminder dates are ISO UTC values. For production multi-user timezone support, timezone should become explicit user input or account configuration.
 
 ## Verification
 
@@ -156,4 +155,4 @@ pnpm test
 pnpm build
 ```
 
-The automated tests cover request validation, strict reminder argument validation, idempotent reminder persistence, and safe error behavior. Full live acceptance testing requires valid OpenAI credentials and a reachable MongoDB instance.
+The automated tests cover request validation, strict reminder argument validation, idempotent reminder persistence, and safe error behavior. Full live acceptance testing requires valid Google Gemini credentials and a reachable MongoDB instance.

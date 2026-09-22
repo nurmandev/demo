@@ -1,13 +1,12 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  OPENAI_API_KEY: z.string().min(1),
+  GEMINI_API_KEY: z.string().min(1),
   MONGODB_URI: z.string().url(),
   MONGODB_DATABASE: z.string().min(1),
   PORT: z.coerce.number().int().positive().default(3000),
   CLIENT_ORIGIN: z.string().url().default("http://localhost:8080"),
-  OPENAI_MODEL: z.string().min(1).default("gpt-4o-mini"),
-  OPENAI_TRANSCRIPTION_MODEL: z.string().min(1).default("gpt-4o-mini-transcribe"),
+  GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash"),
   APP_TIMEZONE: z.string().min(1).default("UTC"),
 });
 
@@ -23,5 +22,5 @@ export function loadEnv(): AppEnv {
 }
 
 export function hasExternalConfiguration() {
-  return Boolean(process.env.OPENAI_API_KEY && process.env.MONGODB_URI && process.env.MONGODB_DATABASE);
+  return Boolean(process.env.GEMINI_API_KEY && process.env.MONGODB_URI && process.env.MONGODB_DATABASE);
 }

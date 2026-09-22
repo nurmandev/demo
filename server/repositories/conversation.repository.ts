@@ -1,10 +1,24 @@
 import { randomUUID } from "node:crypto";
 import type { Db } from "mongodb";
-import type OpenAI from "openai";
+export type StoredRole = "user" | "model" | "tool";
 
-export type StoredMessage = OpenAI.Chat.ChatCompletionMessageParam & {
+export interface StoredFunctionCall {
+  name: string;
+  args: Record<string, unknown>;
+}
+
+export interface StoredFunctionResponse {
+  name: string;
+  response: Record<string, unknown>;
+}
+
+export interface StoredMessage {
+  role: StoredRole;
+  content?: string;
+  functionCalls?: StoredFunctionCall[];
+  functionResponse?: StoredFunctionResponse;
   timestamp: Date;
-};
+}
 
 interface ConversationDocument {
   _id: string;
@@ -28,7 +42,7 @@ export class ConversationRepository {
     return conversation;
   }
 
-  async append(id: string, message: OpenAI.Chat.ChatCompletionMessageParam) {
+  async append(id: string, message: Omit<StoredMessage, "timestamp">) {
     await this.db.collection<ConversationDocument>("conversations").updateOne(
       { _id: id },
       { $push: { messages: { ...message, timestamp: new Date() } }, $set: { updatedAt: new Date() } },
